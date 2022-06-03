@@ -1,6 +1,3 @@
 # LoRa-APRS Tracker for LilyGo T-ECHO with the BME option
 Custom Arduino APRSTracker program for Lillygo T-Echo
-![image](https://user-images.githubusercontent.com/101743242/164885945-75de0a86-5a56-4c45-af79-8909834de12f.png)
-![image](https://user-images.githubusercontent.com/101743242/164886026-fa8b6ef9-a4c3-42ed-b674-eff4d3ccc8a6.png)
-![image](https://user-images.githubusercontent.com/101743242/164886186-3a0354ae-a773-4b9a-bbbf-1f7846e27198.png)
-![image](https://user-images.githubusercontent.com/101743242/164886279-c184ae31-1706-4832-bbfe-6e10dded897e.png)
+![T-Echo01](https://user-images.githubusercontent.com/74018524/171911327-f6921fad-2aaa-4a55-8697-c57a5708f75b.JPG)
