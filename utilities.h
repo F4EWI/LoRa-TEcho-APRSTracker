@@ -72,4 +72,4 @@
 #define MONITOR_SPEED       115200
 #define GPS_BAUD_RATE       9600
 
-#define FREQ                433775000
+#define FREQ                433.775
