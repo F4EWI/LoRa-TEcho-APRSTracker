@@ -109,8 +109,9 @@ void setup() {
     unsigned status;
     
     // default settings
-    status = bme.begin();  
-    if (!status) {
+    if (BME280) {
+      status = bme.begin();  
+      if (!status) {
         Serial.println("Could not find a valid BME280 sensor, check wiring, address, sensor ID!");
         Serial.print("SensorID was: 0x"); Serial.println(bme.sensorID(),16);
         Serial.print("        ID of 0xFF probably means a bad address, a BMP 180 or BMP 085\n");
@@ -118,7 +119,9 @@ void setup() {
         Serial.print("        ID of 0x60 represents a BME 280.\n");
         Serial.print("        ID of 0x61 represents a BME 680.\n");
         while (1) delay(10);
+      }
     }
+
     
     Serial.println("-- Default Test --");
     delayTime = 1000;
