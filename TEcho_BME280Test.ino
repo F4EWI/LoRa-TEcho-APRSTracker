@@ -391,7 +391,8 @@ void loopGPS()
             APRSmsg = APRSheader;
 
             APRSmsg += "!" + String(Lat) + "/" + String(Long) + BEACON_SYMBOL; 
-            APRSmsg += "LoRa Test Tracker by F4AVI & F4EWI";
+//            APRSmsg += "LoRa Test Tracker by F4AVI & F4EWI";
+            APRSmsg += APRS_MESSAGE;
             int stlong = APRSmsg.length();
  
             APRStlm0 = APRSheadertlm;
