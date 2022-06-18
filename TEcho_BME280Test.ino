@@ -52,14 +52,18 @@ char      Lat[9]       = "";
 char      Long[10]     = "";
 char      HLat;
 char      MLong;
+float     volt_tmp;
 float     current;
 int       voltage;
 char      UBatt[6]     = "";
 char      Tension[25]  = "";
+bool      LowBattery   = false;
 bool      charge       = false;
 bool      prot_bat     = false;
 bool      Pwr_en       = false;
 bool      Pwr_on       = false;
+bool      TrameCTRL    = false;
+bool      Cycle5Trames = false;
 
 // APRS Variable
 String APRSmsg = "";
@@ -175,23 +179,42 @@ void loop() {
         Pwr_on = false;
         while (digitalRead(UserButton_Pin) == LOW);
        }
+     if (Pwr_on) {
        
-    // BME280 data reading
-    if ((millis() - last1 > BME_READING_INTERVAL*1000) && BME280) {
+        // BME280 data reading
+        if ((millis() - last1 > BME_READING_INTERVAL*1000) && BME280) {
 
-      Serial.print("Compteur :");
-      Serial.println(counter);
+            Serial.print("Compteur :");
+            Serial.println(counter);
 
-      displayBME();
-      counter++;
-      last1 = millis();
-    }
-    //printValues();
+            displayBME();
+            counter++;
+            last1 = millis();
+        }
 
-    loopGPS();
+        loopGPS();
+     }     
+     //printValues();
+     voltage = analogRead(Adc_Pin);
+     volt_tmp = float(voltage)/1000;
+     volt_tmp = volt_tmp * 7.0125;           // coefficent à appliquer depuis lecture ADC ( Ubat /2 /3.3V /1.0625)
 
-    //delay(delayTime);
-}
+     // Determination of voltage
+     if (volt_tmp > 4.6)
+         charge = true;
+     else
+         charge = false;
+
+     if (volt_tmp < 3.05)
+         LowBattery = true;
+     else
+         LowBattery = false;
+
+     loopGPS();
+
+     if (LowBattery)
+         BatteryEmpty();
+ }
 
 void printValues() {
     Serial.print("Temperature = ");
@@ -290,14 +313,14 @@ void loopGPS()
         display.fillRect(134, 0, 3, 23, GxEPD_BLACK);
 
         // Determination of voltage
-        voltage = analogRead(Adc_Pin);
+       /* voltage = analogRead(Adc_Pin);
         float volt_tmp = float(voltage)/1000;
         volt_tmp = volt_tmp * 7.0125;           // coefficent à appliquer depuis lecture ADC ( Ubat /2 /3.3V /1.0625)
 
         if (volt_tmp > 4.6)
           charge = true;
         else
-          charge = false;
+          charge = false;*/
 
         if (gps->location.isUpdated()) {
             /*SerialMon.print(F("Lat="));
@@ -328,11 +351,6 @@ void loopGPS()
             else {
               SB_TIMER = INTERVAL_MAX;
             }
-
- 
- /*           SerialMon.print(F("SB_COURSE="));
-            SerialMon.println(SB_TIMER);
-*/
 
             display.setFont(&FreeMonoBold9pt7b);
             display.setCursor(0,15);
@@ -383,15 +401,9 @@ void loopGPS()
               
             snprintf(Long, sizeof(Long), "%03d%05s%c", abs(long_tmp1),long_tmp4,MLong);
 
-            /* SerialMon.print("Lat : ");
-            SerialMon.println(Lat);
-            SerialMon.print("Long : ");
-            SerialMon.println(Long);*/   
-
             APRSmsg = APRSheader;
 
             APRSmsg += "!" + String(Lat) + "/" + String(Long) + BEACON_SYMBOL; 
-//            APRSmsg += "LoRa Test Tracker by F4AVI & F4EWI";
             APRSmsg += APRS_MESSAGE;
             int stlong = APRSmsg.length();
  
@@ -436,21 +448,26 @@ void loopGPS()
             APRStlm4 += "T#" + String(TLM) + "," + String(APRStlmpar1) + "," + String(APRStlmpar2) + "," + String(APRStlmpar3) + "," + "0" + "," + "0" + "," + String(APRStlmpar6[1]);
             int stlong4 = APRStlm4.length();  
 
+          /*  SerialMon.print("APRStlm4 = ");
+            SerialMon.println(APRStlm4);   
             SerialMon.print("millis() : ");
             SerialMon.println(millis());   
             SerialMon.println(last2);
             SerialMon.print("millis() - last2 : ");
-            SerialMon.println(millis() - last2);     
+            SerialMon.println(millis() - last2);    
 
+            SerialMon.print("N_trame 1 : ");
+            SerialMon.println(N_trame);  
+            SerialMon.print("N_tlm 1 : ");
+            SerialMon.println(N_tlm);  */
+            
             // Envoi données via LoRa selon la valeur du Timer.
             if (millis() - last2 > SB_TIMER * 1000){
 
-              SerialMon.print("D_par : ");
-              SerialMon.println(D_par);   
- 
+
               //Send LoRa packet to receiver
 
-              if (D_par != N_tlm-10)
+              /*if (D_par != N_tlm-10)
                 {
                 // transmission parametres = false
                 if ( N_trame > 0 && N_trame < 5 )
@@ -465,9 +482,26 @@ void loopGPS()
                   {
                   D_par = N_tlm;
                   } 
-                }
-            SerialMon.print("N_trame : ");
-            SerialMon.println(N_trame);  
+                }*/
+
+            /*if (TrameCTRL) {
+              N_trame = 5;    
+            }*/
+            if (Cycle5Trames) 
+            {
+                D_par++;
+                SerialMon.print("D_par : ");
+                SerialMon.println(D_par);   
+                if (D_par > NUMBER_TRAMES)
+                  {
+                  D_par = 0;
+                  Cycle5Trames = false;
+                  }
+                N_trame = 0;
+            }
+           
+            /*SerialMon.print("N_trame : ");
+            SerialMon.println(N_trame);  */
               switch (N_trame){
                   case 0:
                       //APRS Data
@@ -478,33 +512,41 @@ void loopGPS()
                   case 1:
                       //APRS Telemetry
                       radio.startTransmit(APRStlm0,stlong0);
+                      Serial.print("APRStml0 :");
                       Serial.println(APRStlm0);
-                      N_trame++; 
+                      N_trame++;
                       break;
                   case 2:
                       //APRS Telemetry
                       radio.startTransmit(APRStlm1,stlong1);
+                      Serial.print("APRStml1 :");
                       Serial.println(APRStlm1);
                       N_trame++;
                       break;                                    
                   case 3:
                       //APRS Telemetry
                       radio.startTransmit(APRStlm2,stlong2);
+                      Serial.print("APRStml2 :");
                       Serial.println(APRStlm2);
+                      TrameCTRL = true;
                       N_trame++;
                       break;
                   case 4:
                       //APRS Telemetry
                       radio.startTransmit(APRStlm3,stlong3);
+                      Serial.print("APRStml3 :");
                       Serial.println(APRStlm3);
                       N_trame++;
                       break;
                   case 5:
                       //APRS Telemetry
                       radio.startTransmit(APRStlm4,stlong4);
+                      Serial.print("APRStml4 :");
                       Serial.println(APRStlm4);
                       N_tlm++;
                       N_trame++;
+                      Cycle5Trames = true;
+                      //TrameCTRL = false;
                   break;                  
               }
 
@@ -521,11 +563,6 @@ void loopGPS()
               delay(400);
               digitalWrite(RedLed_Pin, HIGH);  
 
-              /*display.setCursor(12,170);
-              display.setFont(&FreeMonoBold18pt7b);
-              display.println("<< TX >>");*/
-              //Serial.println("<< TX >>");
-           
               //LoRa.endPacket();
               if (N_trame > 5)
                 N_trame = 0;
@@ -709,7 +746,7 @@ void boardInit()
     }
 
     display.update();
-    delay(5000);
+    delay(4000);
 }
 
 void StartupScreen(void)
@@ -733,4 +770,15 @@ void switchOFF(void)
     display.drawExampleBitmap(T_Echo_OFF, 0, 0, GxEPD_WIDTH, GxEPD_HEIGHT, GxEPD_BLACK);
     display.setRotation(3);
     display.updateWindow(0, 0, GxEPD_WIDTH, GxEPD_HEIGHT, false);
+}
+
+void BatteryEmpty() {
+    display.setRotation(0);
+    display.fillScreen(GxEPD_WHITE);
+    display.drawExampleBitmap(Batterie_Vide, 0, 0, GxEPD_WIDTH, GxEPD_HEIGHT, GxEPD_BLACK);
+    display.setRotation(3);
+    display.updateWindow(0, 0, GxEPD_WIDTH, GxEPD_HEIGHT, false);      
+  
+    Pwr_en = false;
+    digitalWrite(Power_Enable_Pin,LOW);  
 }

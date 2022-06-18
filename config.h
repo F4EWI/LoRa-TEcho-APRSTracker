@@ -1,7 +1,7 @@
 // Configuration
 
 // BME setting
-String VERSION            = "Version 1.01a";
+String VERSION            = "Version 1.01b";
 bool BME280               = false;             // false if no BME280 option
 int BME_READING_INTERVAL  = 20;               // BME280 data reading interval in seconde
 
@@ -9,10 +9,13 @@ int BME_READING_INTERVAL  = 20;               // BME280 data reading interval in
 int GPS_READING_INTERVAL  = 10;               // GPS data reading interval in seconde
 
 // General setting
-int TIME_ZONE             = 2;                // Time zone management : 0 -> UTC 
-
+int TIME_ZONE             = 2;                // Time zone management : 0 -> UTC
+int NUMBER_TRAMES         = 10;               // Number of trames with position before sending telemetry.
+int Language = 0;                             // 0 -> French
+                                              // 1 -> English
+                                              // 2 -> German
 // APRS
-String APRS_MESSAGE = "LoRa Test Tracker by F4AVI / F4EWI";
+String APRS_MESSAGE = "LoRa Test Tracker by F4AVI & F4EWI";
 
 // Smart Beacon Parameters
 int ANGLE_MIN             = 25;               // minimum Turn Angle in degrees
@@ -26,11 +29,11 @@ int SF                    = 12;               // Spreading Factor 12 -> for LoRa
 int TX_OUTPUT_POWER       = 22;               // Power maxi 20 dBm
 
 // User setting
-String Call = "F4EWI-7";                      // Call Sign of the operator
+String Call = "F4GVT-7";                      // Call Sign of the operator
 String BEACON_SYMBOL = ">";                   // Caractère définissant le symbôle affiché sur aprs.fi 
                                               // "[" -> Runner
                                               // "<" -> Motocycle
                                               // ">" -> Car
-int Language = 0;                             // 0 -> French
-                                              // 1 -> English
-                                              // 2 -> German
+
+// Receiver functions.
+bool RECEIVER             = false;            // true -> activate the receiver
