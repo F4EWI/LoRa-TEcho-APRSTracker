@@ -1,5 +1,8 @@
 #pragma once
 
+String VERSION            = "Version 1.01c";
+String BuildDate          = "2023.03.28";       // dc7os 20.03.2023: New, date of build
+
 #include <Arduino.h>
 
 #ifndef _PINNUM
@@ -69,7 +72,37 @@
 #define SerialMon           Serial
 #define SerialGPS           Serial2
 
+
 #define MONITOR_SPEED       115200
 #define GPS_BAUD_RATE       9600
 
 #define FREQ                433.775
+
+//
+// DC7OS, 15.03.2023: Switch some Informations off or on. 
+// Telemetry should be off, because there are some wrong data fields.
+//
+#define Telemetry           false
+
+// Smart Beacon Parameters
+// int ANGLE_MIN             = 25;               // minimum Turn Angle in degrees
+// int SPEED_MIN             = 10;               // kmh slow speed
+// int SPEED_MAX             = 90;               // kmh slow speed
+// int INTERVAL_MIN          = 180;              // The interval in seconds for speeds below the min limit
+// int INTERVAL_MAX          = 50;               // The interval in seconds for speeds above the max limit
+// int INTERVAL_DEFAULT      = 30;               // The interval in seconds for speeds beetwen min and max limit speed
+
+// 28.03.2023, dc7os: modified for city urban transport usage
+
+int ANGLE_MIN             = 15;               // minimum Turn Angle in degrees
+int SPEED_MIN             = 10;               // kmh slow speed
+int SPEED_MAX             = 45;               // kmh slow speed
+int INTERVAL_MIN          = 180;              // The interval in seconds for speeds below the min limit
+int INTERVAL_MAX          = 60;               // The interval in seconds for speeds above the max limit
+int INTERVAL_DEFAULT      = 20;               // The interval in seconds for speeds beetwen min and max limit speed
+
+int SF                    = 12;               // Spreading Factor 12 -> for LoRa-APRS
+int TX_OUTPUT_POWER       = 20;               // Power maxi 20 dBm
+
+
+

@@ -7,8 +7,9 @@
 #include <Adafruit_Sensor.h>
 #include <Adafruit_BME280.h>
 #include <RadioLib.h>
-#include <TinyGPS++.h>
+#include <TinyGPSplus.h>
 #include <AceButton.h>
+#include <DHTesp.h>                        // dc7os, 20.03.2023
 
 //Libraries for E-paper Display
 #include <GxEPD.h>
@@ -29,6 +30,9 @@ TinyGPSPlus MyGPS;
 #define SEALEVELPRESSURE_HPA (1013.25)
 
 Adafruit_BME280 bme; // I2C
+
+DHTesp dht;                          // dc7os, 20.03.2023 use DHT22 sensor
+#define DHTPIN I2C_SDA
 
 SPIClass dispPort(NRF_SPIM2, ePaper_Miso, ePaper_Sclk, ePaper_Mosi);
 SPIClass rfPort(NRF_SPIM3, RADIO_MISO_PIN, RADIO_SCLK_PIN, RADIO_MOSI_PIN);
@@ -65,6 +69,12 @@ bool      Pwr_on       = false;
 bool      TrameCTRL    = false;
 bool      Cycle5Trames = false;
 
+bool      RadioOK       = true;
+bool      BL_Toggle     = false;      // dc7os, 13.03.2023: Toogle BackLight via top button
+bool      SENSOR        = false;      // dc7os, 20.03.2023: More then only BME280
+
+int       ypos  = 15;
+
 // APRS Variable
 String APRSmsg = "";
 String LoRaheader = "";
@@ -93,11 +103,12 @@ unsigned long delayTime;
 void setupDisplay();
 void boardInit();
 void StartupScreen();
+
 void enableBacklight(bool en);
 
 void setup() {
   Serial.begin(115200);
-  boardInit();
+  boardInit();                    // and board init after this check
   delay(200);
   StartupScreen();
   //enableBacklight(true);            //light on the screen
@@ -122,10 +133,22 @@ void setup() {
         Serial.print("   ID of 0x56-0x58 represents a BMP 280,\n");
         Serial.print("        ID of 0x60 represents a BME 280.\n");
         Serial.print("        ID of 0x61 represents a BME 680.\n");
-        while (1) delay(10);
+        // while (1) delay(10);     // dc7os, 17.03.2023
+        BME280 = false;             // don't hang if no BME Connected, only switch off
+      }
+    } 
+
+    if (BME280) DHT22_Used = false;
+
+    if (DHT22_Used) {
+      status = (dht.getStatusString() == "OK");
+      if (!status) {
+        DHT22_Used = false;
+      }
+      else  {
+        dht.setup(DHTPIN, dht.AUTO_DETECT);
       }
     }
-
     
     Serial.println("-- Default Test --");
     delayTime = 1000;
@@ -142,16 +165,22 @@ void setup() {
     display.setFont(&FreeMonoBold18pt7b);
     display.println(Call);
     display.setFont(&FreeMonoBold9pt7b);
-
+    display.updateWindow(0, 0, GxEPD_WIDTH, GxEPD_HEIGHT, false); 
 }
 
 void loop() {
 
     // Manage the light of the screen with the upper button
-    if (digitalRead(Touch_Pin) == 0)
-      enableBacklight(true); //ON backlight 
-    else
-      enableBacklight(false);
+    // 13. march 2023
+    // dc7os: Some small changes for blacklight toggling :-)
+
+    if (digitalRead(Touch_Pin) == 0) 
+        BL_Toggle = (not BL_Toggle);
+
+     enableBacklight(BL_Toggle);   
+    //  enableBacklight(true); //ON backlight 
+    // else
+    //  enableBacklight(false);
 
     // Manage the power on and off with the button
     if ((digitalRead(UserButton_Pin) == LOW )&&(Pwr_on == false))
@@ -182,12 +211,14 @@ void loop() {
      if (Pwr_on) {
        
         // BME280 data reading
-        if ((millis() - last1 > BME_READING_INTERVAL*1000) && BME280) {
+//        if ((millis() - last1 > BME_READING_INTERVALL*1000) && BME280) {
+        if ((millis() - last1 > SENSOR_READING_INTERVALL*1000) && SENSOR) {      // dc7os, 20.03.2023: More then only BME280
 
             Serial.print("Compteur :");
             Serial.println(counter);
 
-            displayBME();
+            if (BME280) displayBME();
+            if (DHT22_Used) displayDHT();
             counter++;
             last1 = millis();
         }
@@ -241,9 +272,15 @@ void setupLora()
     display.setRotation(3);
     display.fillScreen(GxEPD_WHITE);
     display.setFont(&FreeMonoBold9pt7b);
-    display.setCursor(30,15);
+    display.setCursor(30,ypos);
     display.print(VERSION);                 // Display the firmware version
-    display.setCursor(0,30);
+    ypos += 15;
+
+    display.setCursor(30,ypos);
+    display.print(BuildDate);
+    ypos += 15;
+
+    display.setCursor(0,ypos);
     rfPort.begin();
     radio = new Module(RADIO_CS_PIN, RADIO_DIO1_PIN, RADIO_RST_PIN , RADIO_BUSY_PIN, rfPort, spiSettings);
  
@@ -253,20 +290,24 @@ void setupLora()
     else
       display.print("[LoRa] Init. : KO");
 
+    ypos += 15;
     display.updateWindow(0, 0, GxEPD_WIDTH, GxEPD_HEIGHT, false);
 }
 
 bool setupGPS()
 {
-    display.setCursor(0,45);
+    display.setCursor(0,ypos);
     display.print("[GPS] Init. ... ");
+    ypos += 15;
     SerialGPS.setPins(GPS_RX_PIN, GPS_TX_PIN);
-    display.setCursor(0,60);
+    display.setCursor(0,ypos);
     display.print("[GPS] Pins :   OK");
+    ypos += 15;
     SerialGPS.begin(GPS_BAUD_RATE);
     SerialGPS.flush();
-    display.setCursor(0,75);
+    display.setCursor(0,ypos);
     display.print("[GPS] Port :   OK");
+    ypos += 15;
 
     pinMode(Gps_pps_Pin, INPUT);
     pinMode(Gps_Wakeup_Pin, OUTPUT);
@@ -278,18 +319,20 @@ bool setupGPS()
     digitalWrite(Gps_Reset_Pin, LOW); delay(10);
     digitalWrite(Gps_Reset_Pin, HIGH);
 
-    display.setCursor(0,90);
+    display.setCursor(0,ypos);
     display.print("[GPS] Reset :  OK");
+    ypos += 15;
 
     gps = new TinyGPSPlus();
   
-    display.setCursor(0,105);
+    display.setCursor(0,ypos);
     display.print("[GPS] Start :  OK");
-
+    
     display.updateWindow(0, 0, GxEPD_WIDTH, GxEPD_HEIGHT, false);
 
     return true;
 }
+
 
 void loopGPS()
 {
@@ -448,6 +491,18 @@ void loopGPS()
             APRStlm4 += "T#" + String(TLM) + "," + String(APRStlmpar1) + "," + String(APRStlmpar2) + "," + String(APRStlmpar3) + "," + "0" + "," + "0" + "," + String(APRStlmpar6[1]);
             int stlong4 = APRStlm4.length();  
 
+            //            
+            // dc7os, 15.03.20203: Add voltage and number of Sats to user comment
+            //
+            
+            if (VoltageSat) {
+              char  sVolt[] = "";
+              sprintf(sVolt,"%0.2fV",volt_tmp);
+              APRSmsg += ", " + String(sVolt) + ", Sat: " + String(sat); 
+             // APRSmsg += ", Sat: " + String(sat);
+              stlong = APRSmsg.length();
+            };
+            
           /*  SerialMon.print("APRStlm4 = ");
             SerialMon.println(APRStlm4);   
             SerialMon.print("millis() : ");
@@ -502,6 +557,10 @@ void loopGPS()
            
             /*SerialMon.print("N_trame : ");
             SerialMon.println(N_trame);  */
+
+            //
+            // dc7os, 15.03.2023: Changes to suppress telemetry
+            // 
               switch (N_trame){
                   case 0:
                       //APRS Data
@@ -511,21 +570,21 @@ void loopGPS()
                       break;
                   case 1:
                       //APRS Telemetry
-                      radio.startTransmit(APRStlm0,stlong0);
+                      if (Telemetry) radio.startTransmit(APRStlm0,stlong0);
                       Serial.print("APRStml0 :");
                       Serial.println(APRStlm0);
                       N_trame++;
                       break;
                   case 2:
                       //APRS Telemetry
-                      radio.startTransmit(APRStlm1,stlong1);
+                      if (Telemetry) radio.startTransmit(APRStlm1,stlong1);
                       Serial.print("APRStml1 :");
                       Serial.println(APRStlm1);
                       N_trame++;
                       break;                                    
                   case 3:
                       //APRS Telemetry
-                      radio.startTransmit(APRStlm2,stlong2);
+                      if (Telemetry) radio.startTransmit(APRStlm2,stlong2);
                       Serial.print("APRStml2 :");
                       Serial.println(APRStlm2);
                       TrameCTRL = true;
@@ -533,14 +592,14 @@ void loopGPS()
                       break;
                   case 4:
                       //APRS Telemetry
-                      radio.startTransmit(APRStlm3,stlong3);
+                      if (Telemetry) radio.startTransmit(APRStlm3,stlong3);
                       Serial.print("APRStml3 :");
                       Serial.println(APRStlm3);
                       N_trame++;
                       break;
                   case 5:
                       //APRS Telemetry
-                      radio.startTransmit(APRStlm4,stlong4);
+                      if (Telemetry) radio.startTransmit(APRStlm4,stlong4);
                       Serial.print("APRStml4 :");
                       Serial.println(APRStlm4);
                       N_tlm++;
@@ -552,16 +611,18 @@ void loopGPS()
 
               display.fillRect(0, 83, GxEPD_WIDTH, 32, GxEPD_BLACK);
               //display.updateWindow(0, 83, GxEPD_WIDTH, GxEPD_HEIGHT, false); 
-              display.setCursor(15,108);
+              display.setCursor(0,108);
               display.setFont(&FreeMonoBold18pt7b);
               display.setTextColor(GxEPD_WHITE);
-              display.println("<< TX >>");
+              display.println(Call);                // dc7os, 19.03.2023: At TX only show call sign inverted
+              display.updateWindow(0, 0, GxEPD_WIDTH, GxEPD_HEIGHT, false); 
               digitalWrite(RedLed_Pin, LOW);
               display.setFont(&FreeMonoBold9pt7b);
               display.setTextColor(GxEPD_BLACK);
               display.updateWindow(0, 0, GxEPD_WIDTH, GxEPD_HEIGHT, false); 
               delay(400);
               digitalWrite(RedLed_Pin, HIGH);  
+              display.updateWindow(0, 0, GxEPD_WIDTH, GxEPD_HEIGHT, false); 
 
               //LoRa.endPacket();
               if (N_trame > 5)
@@ -608,6 +669,7 @@ void loopGPS()
         display.println(Call);
         display.setFont(&FreeMonoBold9pt7b);    
         //display.fillRect(0, 115, GxEPD_WIDTH, 3, GxEPD_BLACK);
+        display.updateWindow(0, 0, GxEPD_WIDTH, GxEPD_HEIGHT, false); 
 
         // Display info from GPS
         digitalWrite(BlueLed_Pin, LOW);
@@ -648,7 +710,7 @@ void displayGPS() {
         display.print(gps->course.deg());
         display.print("deg");      
         display.setCursor(35,193);
-        display.print("Next TX in:");
+        display.print("TX in:");
         display.print(SB_TIMER - ((millis() - last2)/1000));
         display.print("s");             
         display.updateWindow(0, 0, GxEPD_WIDTH, GxEPD_HEIGHT, false);        
@@ -688,6 +750,29 @@ void displayBME() {
         display.updateWindow(0, 0, GxEPD_WIDTH, GxEPD_HEIGHT, false);        
 }
 
+void displayDHT() {
+  display.fillRect(0, 119, 28, 82, GxEPD_BLACK);
+        display.fillRect(29, 119, 171, 82, GxEPD_WHITE);
+        display.setTextColor(GxEPD_WHITE);
+        display.setFont(&FreeMonoBold18pt7b);
+        display.setCursor(3,140);
+        display.println("D");
+        display.setCursor(3,165);
+        display.println("H");
+        display.setCursor(3,190);
+        display.println("T");
+        display.setTextColor(GxEPD_BLACK);        
+        display.setFont(&FreeMonoBold9pt7b); 
+        display.setCursor(35,153);
+        display.print("Temp.:");
+        display.print(dht.getTemperature());
+        display.print("°C");
+        display.setCursor(35,173);
+        display.print("Hum.:");
+        display.print(dht.getHumidity());
+        display.print("%");           
+        display.updateWindow(0, 0, GxEPD_WIDTH, GxEPD_HEIGHT, false);        
+}
 void enableBacklight(bool en)
 {
     digitalWrite(ePaper_Backlight, en);
@@ -735,15 +820,16 @@ void boardInit()
     setupDisplay();
     setupLora();
     setupGPS();
-
-    if (BME280) {
-      display.setCursor(0,125);
-      display.print("[BME] active : Yes");
-    }
-    else {
-      display.setCursor(0,125);
-      display.print("[BME] active : No");      
-    }
+    
+    
+//    if (BME280) {
+//      display.setCursor(0,125);
+//      display.print("[BME] active : Yes");
+//    }
+//    else {
+//      display.setCursor(0,125);
+//      display.print("[BME] active : No");      
+//    }
 
     display.update();
     delay(4000);
